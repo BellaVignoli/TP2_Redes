@@ -24,6 +24,9 @@ struct Topic initTopic(int id_topic, char* name){
     topic.subscribers_count = 0;
     topic.posts_count = 0;
     strcpy(topic.name, name);
+    for(int i = 0; i < 10; i++){
+        topic.subscribers[i].id_client = 0;
+    }
     return topic;
 }
 
@@ -31,7 +34,7 @@ void initBlog(){
     MediumBlog.topics_count = 0;
     MediumBlog.clients_count = 0;
     for(int i = 0; i < 10; i++){
-        MediumBlog.clients[i].id_client = -1;
+        MediumBlog.bool_clients[i] = 0;
     }
 }
 
@@ -54,12 +57,9 @@ void* threadsClient(void* clientThread)
         size_t count_bytes_received = receive_all(csock, &request, sizeof(struct BlogOperation));
         if(count_bytes_received == 0){
             request.operation_type = DESCONTECT_FROM_SERVER;
+            request.client_id = clientData->id_client;
         }
-        struct BlogOperation response = operationType(request);
-        count_bytes_received = send(csock, &response, sizeof(struct BlogOperation), 0);
-        if(count_bytes_received != sizeof(struct BlogOperation)){
-            logexit("send");
-        }
+        operationType(request);
         if(request.operation_type == DESCONTECT_FROM_SERVER){
             close(csock);
             break;
@@ -68,7 +68,7 @@ void* threadsClient(void* clientThread)
     pthread_exit(EXIT_SUCCESS);
 }
 
-struct BlogOperation operationType(struct BlogOperation clientRequest){
+void operationType(struct BlogOperation clientRequest){
     struct BlogOperation serverResponse = createBlogOperation(clientRequest.client_id, 0, 0, " ", " ");
     int topic_id = 0;
         switch ((clientRequest.operation_type))
@@ -78,11 +78,11 @@ struct BlogOperation operationType(struct BlogOperation clientRequest){
             if(topic_id != -1){
                 MediumBlog.topics[topic_id].posts[MediumBlog.topics[topic_id].posts_count] = initPost(clientRequest.client_id, clientRequest.content);
                 MediumBlog.topics[topic_id].posts_count++;
-                printf("new post added in %s by %02d\n", clientRequest.topic, clientRequest.client_id);
+                printf("new post added in %s by %02d\n", clientRequest.topic, clientRequest.client_id + 1);
                 for(int i = 0; i < MAX_USERS; i++){
-                    if(MediumBlog.topics[topic_id].subscribers[i].id_client != 0){
-                        serverResponse = createBlogOperation(clientRequest.client_id, 2, 1, clientRequest.topic, clientRequest.content);
-                        size_t count_bytes_sent = send(MediumBlog.topics[topic_id].subscribers[i].sock, &serverResponse, sizeof(struct BlogOperation), 0);
+                    if(MediumBlog.topics[topic_id].bool_subscribers[i] == 1){
+                        serverResponse = createBlogOperation(clientRequest.client_id + 1, 2, 1, clientRequest.topic, clientRequest.content);
+                        size_t count_bytes_sent = send(MediumBlog.clients[i].sock, &serverResponse, sizeof(struct BlogOperation), 0);
                         if(count_bytes_sent != sizeof(struct BlogOperation)) logexit("send");
                     }
                 }
@@ -110,30 +110,41 @@ struct BlogOperation operationType(struct BlogOperation clientRequest){
                 serverResponse = createBlogOperation(clientRequest.client_id, TOPICS_LIST, 1, " ", topics);
             }
 
+            int count_bytes_send = send(MediumBlog.clients[clientRequest.client_id].sock, &serverResponse, sizeof(struct BlogOperation), 0);
+            if(count_bytes_send != sizeof(struct BlogOperation)){
+                logexit("send");
+            }
+
             break;
 
         case SUBSCRIBE:
             topic_id = lookForTopic(clientRequest.topic);
-            if(topic_id != -1){
-                if((MediumBlog.topics[topic_id].subscribers[MediumBlog.topics[topic_id].subscribers_count].id_client) = clientRequest.client_id){
+            if(topic_id != -1){ // topic exists
+                if(MediumBlog.topics[topic_id].bool_subscribers[clientRequest.client_id] == 1){ // client already subscribed
                     serverResponse = createBlogOperation(clientRequest.client_id, -1, 1, " ", "error: already subscribed\n");
+                    int count_bytes_send = send(MediumBlog.clients[clientRequest.client_id].sock, &serverResponse, sizeof(struct BlogOperation), 0);
+                    if(count_bytes_send != sizeof(struct BlogOperation)){
+                        logexit("send");
+                    }
                 }else{
-                    MediumBlog.topics[topic_id].subscribers[MediumBlog.topics[topic_id].subscribers_count].id_client = clientRequest.client_id;
+                    //MediumBlog.topics[topic_id].subscribers[MediumBlog.topics[topic_id].subscribers_count].id_client = clientRequest.client_id;
+                    MediumBlog.topics[topic_id].bool_subscribers[clientRequest.client_id] = 1;
                     MediumBlog.topics[topic_id].subscribers_count++;
                     printf("client %02d subscribed to %s\n", clientRequest.client_id + 1, clientRequest.topic);
                 }
             }
             else{
-                MediumBlog.topics_count++;
                 MediumBlog.topics[MediumBlog.topics_count] = initTopic(MediumBlog.topics_count, clientRequest.topic);
-                MediumBlog.topics[MediumBlog.topics_count].subscribers[MediumBlog.topics[MediumBlog.topics_count].subscribers_count].id_client = clientRequest.client_id;
+                MediumBlog.topics[MediumBlog.topics_count].bool_subscribers[clientRequest.client_id] = 1;
                 MediumBlog.topics[MediumBlog.topics_count].subscribers_count++;
+                MediumBlog.topics_count++;
                 printf("client %02d subscribed to %s\n", clientRequest.client_id + 1, clientRequest.topic);
             }
             break;
 
         case DESCONTECT_FROM_SERVER:
-            MediumBlog.clients[clientRequest.client_id].id_client = -1;
+            printf("client %02d disconnected\n", clientRequest.client_id + 1);
+            MediumBlog.bool_clients[clientRequest.client_id] = 0;
             MediumBlog.clients_count--;
             for(int i = 0; i < MediumBlog.topics_count; i++){
                 for(int j = 0; j < MediumBlog.topics[i].subscribers_count; j++){
@@ -148,20 +159,14 @@ struct BlogOperation operationType(struct BlogOperation clientRequest){
         case UNSUBSCRIBE:
             topic_id = lookForTopic(clientRequest.topic);
             if(topic_id != -1){
-                if((MediumBlog.topics[topic_id].subscribers[MediumBlog.topics[topic_id].subscribers_count].id_client) = clientRequest.client_id){
-                    MediumBlog.topics[topic_id].subscribers[MediumBlog.topics[topic_id].subscribers_count].id_client = -1;
+                if(MediumBlog.topics[topic_id].bool_subscribers[clientRequest.client_id] == 1){
+                    MediumBlog.topics[topic_id].bool_subscribers[clientRequest.client_id] = 0;
                     MediumBlog.topics[topic_id].subscribers_count--;
                     printf("client %02d unsubscribed from %s\n", clientRequest.client_id + 1, clientRequest.topic);
-                }else{
-                    serverResponse = createBlogOperation(clientRequest.client_id, -3, 1, " ", "error: not subscribed\n");
                 }
-            }
-            else{
-                serverResponse = createBlogOperation(clientRequest.client_id, -4, 1, " ", "error: topic does not exist\n");
             }
             break;
         }
-    return serverResponse;
 }
 
 int main(int argc, char *argv[]){
@@ -207,12 +212,13 @@ int main(int argc, char *argv[]){
         int index = -1;
         for(int i = 0; i < 10; i++){
             //printf("%d\n", MediumBlog.clients[i].id_client);
-            if(MediumBlog.clients[i].id_client == -1){
+            if(MediumBlog.bool_clients[i] == 0){
                 index = i;
-                clientRequest.client_id = index;
-                MediumBlog.clients[index] = initClient(clientRequest.client_id, csock);
+                clientRequest.client_id = i;
+                MediumBlog.clients[i] = initClient(clientRequest.client_id, csock);
+                MediumBlog.bool_clients[i] = 1;
                 MediumBlog.clients_count++;
-                printf("client %02d connected\n", MediumBlog.clients[index].id_client + 1);
+                printf("client %02d connected\n", MediumBlog.clients[i].id_client + 1);
                 break;
             }
         }

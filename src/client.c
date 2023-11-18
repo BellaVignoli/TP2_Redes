@@ -1,6 +1,7 @@
 #include "common.h"
 
 pthread_t waitingThread;
+int currentId = 0;
 
 int inputCommand(char *cmd, char *content){
     cmd[strlen(cmd) - 1] = '\0';
@@ -11,6 +12,7 @@ int inputCommand(char *cmd, char *content){
     if(strcmp(command, "publish") == 0){
         if (strcmp(strtok(NULL, " "), "in"))
         {
+            command = command + 3;
             return ERROR;
         }
         
@@ -24,14 +26,13 @@ int inputCommand(char *cmd, char *content){
         return TOPICS_LIST;
     }else if(strcmp(command, "subscribe") == 0){
         strcpy(content, temp + 10);
-        printf("%s\n", content);
         return SUBSCRIBE;
 
     }else if(strcmp(command, "exit") == 0){
         return DESCONTECT_FROM_SERVER;
 
     }else if(strcmp(command, "unsubscribe") == 0){
-        strcpy(content, temp + 15);
+        strcpy(content, temp + 12);
         return UNSUBSCRIBE;
     }else{
         return -1;
@@ -40,7 +41,7 @@ int inputCommand(char *cmd, char *content){
 }
 
 void serverResponseHandler(struct BlogOperation serverResponse){
-    if(serverResponse.operation_type == TOPICS_LIST || serverResponse.operation_type == SUBSCRIBE || serverResponse.operation_type == UNSUBSCRIBE || serverResponse.operation_type == ERROR){
+    if(serverResponse.operation_type == TOPICS_LIST || serverResponse.operation_type == ERROR){
         printf("%s\n", serverResponse.content);
     }else if(serverResponse.operation_type == NEW_POST){
         printf("new post added in %s by %02d\n%s", serverResponse.topic, serverResponse.client_id, serverResponse.content);
@@ -51,7 +52,7 @@ void serverResponseHandler(struct BlogOperation serverResponse){
 void *serverData(void *data){
     int *sockfd = (int *)data;
     while(1){
-        struct BlogOperation serverResponse;
+        struct BlogOperation serverResponse = createBlogOperation(0, 0, 0, " ", " ");
         receive_all(*sockfd, &serverResponse, sizeof(struct BlogOperation));
         serverResponseHandler(serverResponse);
         if(serverResponse.operation_type == DESCONTECT_FROM_SERVER){
@@ -85,9 +86,7 @@ int main(int argc, char **argv){
     if(count != sizeof(req)) logexit("send");
     struct BlogOperation res;
     receive_all(sockfd, &res, sizeof(res)); // receive server response
-    int currentId = 0;
     currentId = res.client_id;
-    printf("client %02d connected\n", currentId + 1);
     pthread_create(&waitingThread, NULL, (void*) &serverData, (void*) &sockfd);
 
     char cmd[2048];
@@ -121,8 +120,10 @@ int main(int argc, char **argv){
         }
         if(command != ERROR){
             count = send(sockfd, &req, sizeof(req), 0); // send req to server
-            //printBlogOperation(req);
             if(count != sizeof(req)) logexit("send");
+        }
+        if(command == DESCONTECT_FROM_SERVER){
+            break;
         }
         
     }

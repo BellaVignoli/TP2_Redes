@@ -21,6 +21,7 @@ struct Topic{
     int id_topic;
     char name[50];
     struct Client subscribers[10];
+    int bool_subscribers[10];
     int subscribers_count;
     struct Post posts[100];
     int posts_count;
@@ -29,6 +30,7 @@ struct Topic{
 struct Blog{
     struct Topic topics[100];
     struct Client clients[10];
+    int bool_clients[10];
     int topics_count;
     int clients_count;
 };
@@ -39,6 +41,6 @@ struct Topic initTopic(int id, char* name);
 void initBlog();
 int lookForTopic(char* topic);
 void* threadsClient(void* clientThread);
-struct BlogOperation operationType(struct BlogOperation clientRequest);
+void operationType(struct BlogOperation clientRequest);
 
 #endif
