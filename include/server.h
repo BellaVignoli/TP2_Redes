@@ -35,7 +35,7 @@ struct Blog{
 
 struct Client initClient(int id, int sock);
 struct Post initPost(int author, char* content);
-struct Topic initTopic(int id, char* name, char* content);
+struct Topic initTopic(int id, char* name);
 void initBlog();
 int lookForTopic(char* topic);
 void* threadsClient(void* clientThread);

@@ -11,8 +11,7 @@ int inputCommand(char *cmd, char *content){
     if(strcmp(command, "publish") == 0){
         if (strcmp(strtok(NULL, " "), "in"))
         {
-            printf("Error! Invalid command\n");
-            exit(1);
+            return ERROR;
         }
         
         strcpy(content, temp + 11);
@@ -20,8 +19,7 @@ int inputCommand(char *cmd, char *content){
     }else if(strcmp(command, "list") == 0){
         if (strcmp(strtok(NULL, " "), "topics"))
         {
-            printf("Error! Invalid command\n");
-            exit(1);
+            return ERROR;
         }
         return TOPICS_LIST;
     }else if(strcmp(command, "subscribe") == 0){
@@ -55,10 +53,6 @@ void *serverData(void *data){
     while(1){
         struct BlogOperation serverResponse;
         receive_all(*sockfd, &serverResponse, sizeof(struct BlogOperation));
-        // int numBytesRcvd = recv(*sockfd, &serverResponse, sizeof(struct BlogOperation), 0);
-        // if (numBytesRcvd < 0)
-        //     printf("recv() failed");
-        printBlogOperation(serverResponse);
         serverResponseHandler(serverResponse);
         if(serverResponse.operation_type == DESCONTECT_FROM_SERVER){
             close(*sockfd);
@@ -102,8 +96,6 @@ int main(int argc, char **argv){
         fgets(cmd, 2048, stdin);
         char * topic = malloc(sizeof(char) * 2048);
         int command = inputCommand(cmd, topic);
-        //printf("%d\n", command);
-        //printf(">>>>>>>>>>>%s\n", topic);
         switch(command){
             case NEW_POST:
                 fgets(cmd, 2048, stdin);
@@ -127,9 +119,11 @@ int main(int argc, char **argv){
                 printf("Invalid command\n");
                 break;
         }
-
-        count = send(sockfd, &req, sizeof(req), 0); // send req to server
-        //printBlogOperation(req);
-        if(count != sizeof(req)) logexit("send");
+        if(command != ERROR){
+            count = send(sockfd, &req, sizeof(req), 0); // send req to server
+            //printBlogOperation(req);
+            if(count != sizeof(req)) logexit("send");
+        }
+        
     }
 }
