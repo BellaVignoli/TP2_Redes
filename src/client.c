@@ -15,7 +15,6 @@ int inputCommand(char *cmd, char *content){
             command = command + 3;
             return ERROR;
         }
-        
         strcpy(content, temp + 11);
         return NEW_POST;
     }else if(strcmp(command, "list") == 0){
@@ -29,7 +28,7 @@ int inputCommand(char *cmd, char *content){
         return SUBSCRIBE;
 
     }else if(strcmp(command, "exit") == 0){
-        return DESCONTECT_FROM_SERVER;
+        return DISCONNECT;
 
     }else if(strcmp(command, "unsubscribe") == 0){
         strcpy(content, temp + 12);
@@ -45,7 +44,7 @@ void serverResponseHandler(struct BlogOperation serverResponse){
         printf("%s\n", serverResponse.content);
     }else if(serverResponse.operation_type == NEW_POST){
         printf("new post added in %s by %02d\n%s", serverResponse.topic, serverResponse.client_id, serverResponse.content);
-    }else if(serverResponse.operation_type == DESCONTECT_FROM_SERVER){
+    }else if(serverResponse.operation_type == DISCONNECT){
         printf("exit\n");
     }
 }
@@ -55,7 +54,7 @@ void *serverData(void *data){
         struct BlogOperation serverResponse = createBlogOperation(0, 0, 0, " ", " ");
         receive_all(*sockfd, &serverResponse, sizeof(struct BlogOperation));
         serverResponseHandler(serverResponse);
-        if(serverResponse.operation_type == DESCONTECT_FROM_SERVER){
+        if(serverResponse.operation_type == DISCONNECT){
             close(*sockfd);
             break;
         }
@@ -82,10 +81,10 @@ int main(int argc, char **argv){
     }
 
     struct BlogOperation req = createBlogOperation(0, NEW_CONECTION, 0, " ", " ");
-    int count = send(sockfd, &req, sizeof(req), 0); // send client_operation to server
+    int count = send(sockfd, &req, sizeof(req), 0);
     if(count != sizeof(req)) logexit("send");
     struct BlogOperation res;
-    receive_all(sockfd, &res, sizeof(res)); // receive server response
+    receive_all(sockfd, &res, sizeof(res));
     currentId = res.client_id;
     pthread_create(&waitingThread, NULL, (void*) &serverData, (void*) &sockfd);
 
@@ -111,7 +110,7 @@ int main(int argc, char **argv){
             case UNSUBSCRIBE:
                 req = createBlogOperation(currentId, command, 0, topic, " ");
                 break;
-            case DESCONTECT_FROM_SERVER:
+            case DISCONNECT:
                 req = createBlogOperation(currentId, command, 0, " ", " ");
                 break;
             case ERROR:
@@ -119,12 +118,11 @@ int main(int argc, char **argv){
                 break;
         }
         if(command != ERROR){
-            count = send(sockfd, &req, sizeof(req), 0); // send req to server
+            count = send(sockfd, &req, sizeof(req), 0);
             if(count != sizeof(req)) logexit("send");
         }
-        if(command == DESCONTECT_FROM_SERVER){
+        if(command == DISCONNECT){
             break;
         }
-        
     }
 }

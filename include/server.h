@@ -35,10 +35,10 @@ struct Blog{
     int clients_count;
 };
 
-struct Client initClient(int id, int sock);
-struct Post initPost(int author, char* content);
-struct Topic initTopic(int id, char* name);
-void initBlog();
+struct Client newClient(int id, int sock);
+struct Post newPost(int author, char* content);
+struct Topic newTopic(int id, char* name);
+void newBlog();
 int lookForTopic(char* topic);
 void* threadsClient(void* clientThread);
 void operationType(struct BlogOperation clientRequest);

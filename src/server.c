@@ -4,21 +4,21 @@
 sem_t mutex;
 struct Blog MediumBlog;
 
-struct Client initClient(int id, int sock){
+struct Client newClient(int id, int sock){
     struct Client client;
     client.id_client = id;
     client.sock = sock;
     return client;
 }
 
-struct Post initPost(int author, char* content){
+struct Post newPost(int author, char* content){
     struct Post post;
     post.author = author;
     strcpy(post.content, content);
     return post;
 }
 
-struct Topic initTopic(int id_topic, char* name){
+struct Topic newTopic(int id_topic, char* name){
     struct Topic topic;    
     topic.id_topic = id_topic;
     topic.subscribers_count = 0;
@@ -30,7 +30,7 @@ struct Topic initTopic(int id_topic, char* name){
     return topic;
 }
 
-void initBlog(){
+void newBlog(){
     MediumBlog.topics_count = 0;
     MediumBlog.clients_count = 0;
     for(int i = 0; i < 10; i++){
@@ -56,11 +56,11 @@ void* threadsClient(void* clientThread)
     while(true){
         size_t count_bytes_received = receive_all(csock, &request, sizeof(struct BlogOperation));
         if(count_bytes_received == 0){
-            request.operation_type = DESCONTECT_FROM_SERVER;
+            request.operation_type = DISCONNECT;
             request.client_id = clientData->id_client;
         }
         operationType(request);
-        if(request.operation_type == DESCONTECT_FROM_SERVER){
+        if(request.operation_type == DISCONNECT){
             close(csock);
             break;
         }
@@ -76,7 +76,7 @@ void operationType(struct BlogOperation clientRequest){
         case NEW_POST:
             topic_id = lookForTopic(clientRequest.topic);
             if(topic_id != -1){
-                MediumBlog.topics[topic_id].posts[MediumBlog.topics[topic_id].posts_count] = initPost(clientRequest.client_id, clientRequest.content);
+                MediumBlog.topics[topic_id].posts[MediumBlog.topics[topic_id].posts_count] = newPost(clientRequest.client_id, clientRequest.content);
                 MediumBlog.topics[topic_id].posts_count++;
                 printf("new post added in %s by %02d\n", clientRequest.topic, clientRequest.client_id + 1);
                 for(int i = 0; i < MAX_USERS; i++){
@@ -89,8 +89,8 @@ void operationType(struct BlogOperation clientRequest){
             }
             else{
                 
-                MediumBlog.topics[MediumBlog.topics_count] = initTopic(MediumBlog.topics_count, clientRequest.topic);
-                MediumBlog.topics[MediumBlog.topics_count].posts[0] = initPost(clientRequest.client_id, clientRequest.content);
+                MediumBlog.topics[MediumBlog.topics_count] = newTopic(MediumBlog.topics_count, clientRequest.topic);
+                MediumBlog.topics[MediumBlog.topics_count].posts[0] = newPost(clientRequest.client_id, clientRequest.content);
                 MediumBlog.topics_count++;
                 MediumBlog.topics[MediumBlog.topics_count].posts_count++;
                 printf("new post added in %s by %02d\n", clientRequest.topic, clientRequest.client_id + 1);
@@ -134,7 +134,7 @@ void operationType(struct BlogOperation clientRequest){
                 }
             }
             else{
-                MediumBlog.topics[MediumBlog.topics_count] = initTopic(MediumBlog.topics_count, clientRequest.topic);
+                MediumBlog.topics[MediumBlog.topics_count] = newTopic(MediumBlog.topics_count, clientRequest.topic);
                 MediumBlog.topics[MediumBlog.topics_count].bool_subscribers[clientRequest.client_id] = 1;
                 MediumBlog.topics[MediumBlog.topics_count].subscribers_count++;
                 MediumBlog.topics_count++;
@@ -142,7 +142,7 @@ void operationType(struct BlogOperation clientRequest){
             }
             break;
 
-        case DESCONTECT_FROM_SERVER:
+        case DISCONNECT:
             printf("client %02d disconnected\n", clientRequest.client_id + 1);
             MediumBlog.bool_clients[clientRequest.client_id] = 0;
             MediumBlog.clients_count--;
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]){
         logexit("listen");
     }
 
-    initBlog();
+    newBlog();
 
     while(1){
         struct sockaddr_storage cstorage;
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]){
             if(MediumBlog.bool_clients[i] == 0){
                 index = i;
                 clientRequest.client_id = i;
-                MediumBlog.clients[i] = initClient(clientRequest.client_id, csock);
+                MediumBlog.clients[i] = newClient(clientRequest.client_id, csock);
                 MediumBlog.bool_clients[i] = 1;
                 MediumBlog.clients_count++;
                 printf("client %02d connected\n", MediumBlog.clients[i].id_client + 1);

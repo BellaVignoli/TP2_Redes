@@ -5,10 +5,6 @@ void logexit(char *msg) {
     exit(EXIT_FAILURE);
 }
 
-void errorHandler(char* error) {
-    printf("%s\n", error);
-}
-
 int addrparse(const char *addrstr, const char *portstr, struct sockaddr_storage *storage){
 
     if( addrstr == NULL || portstr == NULL ) {
@@ -103,12 +99,4 @@ struct BlogOperation createBlogOperation(int client_id, int operation_type, int 
     strcpy(operation.topic, topic);
     strcpy(operation.content, content);
     return operation;
-}
-
-void printBlogOperation (struct BlogOperation blogOperation){
-    printf("client_id: %d\n", blogOperation.client_id);
-    printf("operation_type: %d\n", blogOperation.operation_type);
-    printf("server_response: %d\n", blogOperation.server_response);
-    printf("topic: %s\n", blogOperation.topic);
-    printf("content: %s\n", blogOperation.content);
 }
